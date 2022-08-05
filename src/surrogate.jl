@@ -51,3 +51,55 @@ function encode(B::BinaryHammingSurrogate, db_::AbstractDatabase, queries_::Abst
     params["npairs"] = length(B.pairs)
     (; db, queries, params, dist)
 end
+
+#=
+
+struct MaxPoolSurrogate <: AbstractSurrogate
+    kscale::Int
+    pool::Matrix{Int32}
+    
+    function MaxPoolSurrogate(samplesize::Integer, npools::Integer, dim::Integer, kscale::Integer)
+        pool = Matrix{Float32}(undef, samplesize, npools)
+        perm = Vector{Int32}(1:dim)
+      
+        for i in 1:npools
+            randperm!(perm)
+            pool[:, i] .= view(perm, 1:samplesize)
+        end
+        
+        new(kscale, pool)
+    end
+end
+
+samplesize(M::MaxPoolSurrogate) = size(M.pool, 1)
+npools(M::MaxPoolSurrogate) = size(M.pool, 2)
+kscale(M::MaxPoolSurrogate) = M.kscale
+
+function encode(M::MaxPoolSurrogate, vout, v)
+    for i in eachindex(vout)
+        vout[i] = maximum(j -> v[j], view(M.pool, :, i))
+    end
+    
+    vout
+end
+
+function encode(M::MaxPoolSurrogate, db_::AbstractDatabase)
+    D = Matrix{Float32}(undef, npools(M), length(db_))
+    
+    for i in eachindex(db_)
+        encode(M, view(D, :, i), db_[i])
+    end
+
+    MatrixDatabase(D)
+end
+
+function encode(M::MaxPoolSurrogate, db_::AbstractDatabase, queries_::AbstractDatabase, params)
+    dist = L2Distance()
+    db = encode(M, db_)
+    queries = encode(M, queries_)
+    params["surrogate"] = "maxpool"
+    params["kscale"] = M.kscale
+    (; db, queries, params, dist)
+end
+
+=#
