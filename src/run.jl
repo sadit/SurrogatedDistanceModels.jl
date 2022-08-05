@@ -21,8 +21,8 @@ function getfilename(path, params; prefix="", suffix="")
         
         print(buff, "$k=$v")
     end
-    print(buff, suffix)
     
+    print(buff, suffix)
     joinpath(DATAPATH, String(take!(buff)))
 end
 

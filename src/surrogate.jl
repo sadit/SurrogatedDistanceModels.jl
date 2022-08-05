@@ -4,6 +4,8 @@ struct BinaryHammingFixedPairs <: AbstractSurrogate
     kscale::Int
 end
 
+kscale(m::BinaryHammingFixedPairs) = m.kscale
+
 encode(::BinaryHammingFixedPairs, v, i::Integer)::Bool = v[i] < v[end-i+1]
 encode(B::BinaryHammingFixedPairs, v) = (encode.((B,), (v,), 1:length(v) ÷ 2)).chunks
 
@@ -39,6 +41,7 @@ struct BinaryHammingSurrogate <: AbstractSurrogate
     end
 end
 
+kscale(m::BinaryHammingSurrogate) = m.kscale
 encode(B::BinaryHammingSurrogate, v, p::Tuple)::Bool = v[p[1]] < v[p[2]]
 encode(B::BinaryHammingSurrogate, v) = (encode.((B,), (v,), B.pairs)).chunks
 
