@@ -1,3 +1,5 @@
+using Random
+
 abstract type AbstractSurrogate end
 
 struct BinaryHammingFixedPairs <: AbstractSurrogate
@@ -25,6 +27,8 @@ function random_sorted_pair(dim)
     a < b ? (a, b) : (b, a)
 end
 
+#############
+
 struct BinaryHammingSurrogate <: AbstractSurrogate
     kscale::Int
     pairs::Vector{Tuple{Int32,Int32}}
@@ -45,10 +49,19 @@ kscale(m::BinaryHammingSurrogate) = m.kscale
 encode(B::BinaryHammingSurrogate, v, p::Tuple)::Bool = v[p[1]] < v[p[2]]
 encode(B::BinaryHammingSurrogate, v) = (encode.((B,), (v,), B.pairs)).chunks
 
+function encode(B::BinaryHammingSurrogate, X::AbstractDatabase)
+    V = Vector{Vector{UInt64}}(undef, length(X))
+    Threads.@threads for i in eachindex(X)
+        V[i] = encode(B, X[i])
+    end
+
+    VectorDatabase(V)
+end
+
 function encode(B::BinaryHammingSurrogate, db_::AbstractDatabase, queries_::AbstractDatabase, params)
     dist = BinaryHammingDistance()
-    db = VectorDatabase([encode(B, db_[i]) for i in eachindex(db_)])
-	queries = VectorDatabase([encode(B, queries_[i]) for i in eachindex(queries_)])
+    db = encode(B, db_)
+	queries = encode(B, queries_)
     params["surrogate"] = "BHS"
     params["kscale"] = B.kscale
     params["npairs"] = length(B.pairs)
@@ -106,3 +119,59 @@ function encode(M::MaxPoolSurrogate, db_::AbstractDatabase, queries_::AbstractDa
 end
 
 =#
+
+###############
+
+struct MaxHashSurrogate <: AbstractSurrogate
+    kscale::Int
+    pool::Matrix{Int32}
+    
+    function MaxHashSurrogate(samplesize::Integer, npools::Integer, dim::Integer, kscale::Integer)
+        samplesize < 256 || throw(ArgumentError("samplesize < 256: $samplesize"))
+        pool = Matrix{Int32}(undef, samplesize, npools)
+        perm = Vector{Int32}(1:dim)
+      
+        for i in 1:npools
+            randperm!(perm)
+            pool[:, i] .= view(perm, 1:samplesize)
+        end
+        
+        new(kscale, pool)
+    end
+end
+
+samplesize(M::MaxHashSurrogate) = size(M.pool, 1)
+npools(M::MaxHashSurrogate) = size(M.pool, 2)
+kscale(M::MaxHashSurrogate) = M.kscale
+
+function encode(M::MaxHashSurrogate, vout, v)
+    for i in eachindex(vout)
+        #vout[i] = maximum(j -> v[j], view(M.pool, :, i))
+        vout[i] = findmax(j -> v[j], view(M.pool, :, i)) |> last
+    end
+    
+    vout
+end
+
+function encode(M::MaxHashSurrogate, db_::AbstractDatabase)
+    D = Matrix{UInt8}(undef, npools(M), length(db_))
+    
+    Threads.@threads for i in eachindex(db_)
+        encode(M, view(D, :, i), db_[i])
+    end
+
+    MatrixDatabase(D)
+end
+
+function encode(M::MaxHashSurrogate, db_::AbstractDatabase, queries_::AbstractDatabase, params)
+    dist = StringHammingDistance()
+    db = encode(M, db_)
+    queries = encode(M, queries_)
+    params["surrogate"] = "MaxHash"
+    params["samplesize"] = samplesize(M)
+    params["npools"] = npools(M)
+    params["kscale"] = kscale(M)
+    
+    (; db, queries, params, dist)
+end
+
