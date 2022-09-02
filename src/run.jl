@@ -2,7 +2,7 @@ using JSON
 
 const DATAPATH = "../data/"
 
-function getfilename(path, params; prefix="", suffix="")
+function getfilename(path, params; prefix="", suffix="", ignorekeys=["enctime"])
     parts = sort!(collect(params), by=first)
     buff = IOBuffer()
     n = length(parts)
@@ -13,6 +13,7 @@ function getfilename(path, params; prefix="", suffix="")
         v isa NamedTuple && continue
         v isa AbstractDict && continue
         v isa AbstractArray && continue
+        k in ignorekeys && continue
         if started
             print(buff, "--")
         else
