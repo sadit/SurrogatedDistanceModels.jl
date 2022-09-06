@@ -22,7 +22,6 @@ end
 @inline nperms(M::CompBinPerms) = size(M.pool, 2)
 @inline shift(M::CompBinPerms) = M.shift
 
-
 function encode_object!(M::CompBinPerms, vout, v, cache::PermsCacheEncoder)
     for i in 1:nperms(M)
         col = view(M.pool, :, i)

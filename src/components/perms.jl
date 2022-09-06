@@ -3,7 +3,7 @@ export CompPerms
 struct CompPerms <: AbstractSurrogate
     pool::Matrix{Int32}
     
-    function CompPerms(permsize::Integer, nperms::Integer, dim::Integer)
+    function CompPerms(nperms::Integer, dim::Integer; permsize::Integer=64)
         2 <= permsize || throw(ArgumentError("invalid permsize $permsize"))
         @show :CompPerms, permsize, nperms, dim
         pool = Matrix{Int32}(undef, permsize, nperms)

@@ -13,6 +13,7 @@ Queryverse = "612083be-0b0f-5412-89c1-4e7c75506a58"
 SimSearchManifoldLearning = "ca7ab67e-1aa0-420a-90d9-eb5aef468722"
 SimilaritySearch = "053f045d-5466-53fd-b400-a066f88fe02a"
 StatsPlots = "f3b207a7-027a-5e70-b257-86293d7955fd"
+SurrogateDistanceModels = "0e04eddd-96ac-454e-8372-d12cc190ad6e"
 
 [compat]
 Embeddings = "0.4"

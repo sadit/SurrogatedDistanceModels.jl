@@ -1,16 +1,16 @@
-export CompTopK
+export TopK
 
-struct CompTopK <: AbstractSurrogate
+struct TopK <: AbstractSurrogate
     topk::Int
     dim::Int
    
-    CompTopK(topk, dim) = new(topk, ceil(Int, dim / 64) * 64)
+    TopK(topk, dim) = new(topk, ceil(Int, dim / 64) * 64)
 end
 
-topk(T::CompTopK) = T.topk
-dim(T::CompTopK) = T.dim
+topk(T::TopK) = T.topk
+dim(T::TopK) = T.dim
 
-function encode_object!(M::CompTopK, out, v, res::KnnResult, tmp::BitArray)
+function encode_object!(M::TopK, out, v, res::KnnResult, tmp::BitArray)
     reuse!(res, topk(M))
     fill!(tmp, 0)
     
@@ -25,7 +25,7 @@ function encode_object!(M::CompTopK, out, v, res::KnnResult, tmp::BitArray)
     copy!(out, tmp.chunks)
 end
 
-function encode_database(M::CompTopK, db_::AbstractDatabase)
+function encode_database(M::TopK, db_::AbstractDatabase)
     D = Matrix{UInt64}(undef, dim(M) ÷ 64, length(db_))
     R = [KnnResult(M.topk) for _ in 1:Threads.nthreads()]
     B = [BitArray(undef, dim(M)) for _ in 1:Threads.nthreads()]
@@ -38,7 +38,7 @@ function encode_database(M::CompTopK, db_::AbstractDatabase)
     MatrixDatabase(D)
 end
 
-function encode(M::CompTopK, db_::AbstractDatabase, queries_::AbstractDatabase, params)
+function encode(M::TopK, db_::AbstractDatabase, queries_::AbstractDatabase, params)
     dist = BinaryHammingDistance()
     db = encode(M, db_)
     queries = encode(M, queries_)

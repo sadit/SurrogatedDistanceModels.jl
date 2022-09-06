@@ -1,15 +1,16 @@
 export BinPerms
 
-struct BinPerms{DbType<:AbstractDatabase,DistType<:SemiMetric} <: AbstractSurrogate
+
+struct BinPerms{DistType<:SemiMetric,DbType<:AbstractDatabase} <: AbstractSurrogate
     dist::DistType
     refs::DbType
     pool::Matrix{Int32}
     shift::Int
     
-    function BinPerms(dist::SemiMetric, refs::AbstractDatabase, nperms::Integer; permsize::Integer=64, shift::Integer=length(refs) ÷ 3)
+    function BinPerms(dist::SemiMetric, refs::AbstractDatabase, nperms::Integer; permsize::Integer=64, shift::Integer=permsize ÷ 3)
         2 <= permsize <= 64 || throw(ArgumentError("invalid permsize $permsize"))
         pool = Matrix{Int32}(undef, permsize, nperms)
-        perm = Vector{Int32}(1:dim)
+        perm = Vector{Int32}(1:length(refs))
 
         for i in 1:nperms
             shuffle!(perm)
@@ -65,7 +66,6 @@ function encode(M::BinPerms, db_::AbstractDatabase, queries_::AbstractDatabase, 
     params["permsize"] = permsize(M)
     params["nperms"] = nperms(M)
     params["shift"] = shift(M)
-    params["kscale"] = kscale(M)
     
     (; db, queries, params, dist)
 end

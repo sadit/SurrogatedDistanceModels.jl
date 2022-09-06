@@ -1,6 +1,6 @@
 using JLD2, LinearAlgebra, SimilaritySearch
 
-const DBPATH = "../metric-datasets/"
+const DBPATH = "metric-datasets/"
 
 function pack_cos_db(train, test, name)
     for c in eachcol(train) normalize!(c) end

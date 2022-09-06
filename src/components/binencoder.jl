@@ -1,9 +1,9 @@
-export CompBinEncoder
+export BinEncoder
 
-struct CompBinEncoder <: AbstractSurrogate
+struct BinEncoder <: AbstractSurrogate
     pairs::Array{Int32}
 
-    function CompBinEncoder(npairs::Integer, dim::Integer)
+    function BinEncoder(npairs::Integer, dim::Integer)
         nblocks = ceil(Int, npairs / 64)
         P = zeros(Int32, 2, 64, nblocks)
         prob = 1.2 * npairs / ((dim^2 + dim) / 2)
@@ -23,9 +23,9 @@ struct CompBinEncoder <: AbstractSurrogate
     end
 end
 
-npairs(m::CompBinEncoder) = 64 * size(m.pairs, 3)
+npairs(m::BinEncoder) = 64 * size(m.pairs, 3)
 
-function encode_object!(B::CompBinEncoder, vout, v)
+function encode_object!(B::BinEncoder, vout, v)
     for i in eachindex(vout)
         E = zero(UInt64)
         for j in 1:64
@@ -38,8 +38,8 @@ function encode_object!(B::CompBinEncoder, vout, v)
     end
 end
 
-function encode_database(B::CompBinEncoder, X::AbstractDatabase)
-    D = Matrix{UInt64}(undef, size(m.pairs, 3), length(X))
+function encode_database(B::BinEncoder, X::AbstractDatabase)
+    D = Matrix{UInt64}(undef, size(B.pairs, 3), length(X))
     Threads.@threads for i in eachindex(X)
         encode_object!(B, view(D, :, i), X[i])
     end
@@ -47,7 +47,7 @@ function encode_database(B::CompBinEncoder, X::AbstractDatabase)
     MatrixDatabase(D)
 end
 
-function encode(B::CompBinEncoder, db_::AbstractDatabase, queries_::AbstractDatabase, params)
+function encode(B::BinEncoder, db_::AbstractDatabase, queries_::AbstractDatabase, params)
     dist = BinaryHammingDistance()
     db = encode_database(B, db_)
 	queries = encode_database(B, queries_)

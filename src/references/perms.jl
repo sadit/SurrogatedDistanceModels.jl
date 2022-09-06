@@ -8,7 +8,7 @@ struct Perms{DistType<:SemiMetric,DbType<:AbstractDatabase} <: AbstractSurrogate
     function Perms(dist::SemiMetric, refs::AbstractDatabase, nperms::Integer; permsize::Integer=64)
         2 <= permsize <= length(refs)|| throw(ArgumentError("invalid permsize $permsize"))
         pool = Matrix{Int32}(undef, permsize, nperms)
-        perm = Vector{Int32}(1:dim)
+        perm = Vector{Int32}(1:length(refs))
 
         for i in 1:nperms
             shuffle!(perm)

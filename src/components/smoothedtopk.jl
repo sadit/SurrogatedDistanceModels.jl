@@ -37,20 +37,20 @@ function binsearch_optim_topk(lfun::LogisticFunction, X, k::Float64; tol=1e-1, m
     t
 end
 
-struct CompSmoothedTopK <: AbstractSurrogate
+struct SmoothedTopK <: AbstractSurrogate
     topk::Int
     dim::Int
     kscale::Int
     lfun::LogisticFunction
     
-    CompSmoothedTopK(topk, dim, kscale) = new(topk, dim, kscale, LogisticFunction(8))
+    SmoothedTopK(topk, dim, kscale) = new(topk, dim, kscale, LogisticFunction(8))
 end
 
-kscale(T::CompSmoothedTopK) = T.kscale
-topk(T::CompSmoothedTopK) = T.topk
-dim(T::CompSmoothedTopK) = T.dim
+kscale(T::SmoothedTopK) = T.kscale
+topk(T::SmoothedTopK) = T.topk
+dim(T::SmoothedTopK) = T.dim
 
-function encode(M::CompSmoothedTopK, out, X)
+function encode(M::SmoothedTopK, out, X)
     lfun = M.lfun
     t = binsearch_optim_topk(lfun, X, 5.0)
     #@show t smooth_topk(lfun, X, t)
@@ -61,7 +61,7 @@ function encode(M::CompSmoothedTopK, out, X)
     out
 end
 
-function encode(M::CompSmoothedTopK, db_::AbstractDatabase)
+function encode(M::SmoothedTopK, db_::AbstractDatabase)
     D = Matrix{Float32}(undef, dim(M), length(db_))
     Threads.@threads for i in eachindex(db_)
         tid = Threads.threadid()
@@ -71,7 +71,7 @@ function encode(M::CompSmoothedTopK, db_::AbstractDatabase)
     MatrixDatabase(D)
 end
 
-function encode(M::CompSmoothedTopK, db_::AbstractDatabase, queries_::AbstractDatabase, params)
+function encode(M::SmoothedTopK, db_::AbstractDatabase, queries_::AbstractDatabase, params)
     dist = L2Distance()
     db = encode(M, db_)
     queries = encode(M, queries_)
