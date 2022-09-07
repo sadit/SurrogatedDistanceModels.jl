@@ -63,7 +63,6 @@ function main()
         @show size(D.db.matrix), D.dist
         run_experiment(D, k)
     end
-
     
     let
         D = load_wit_300k()
@@ -71,7 +70,6 @@ function main()
         run_experiment(D, k)
     end
 
-#=
     let
         D = load_glove_1m()
         @show size(D.db.matrix), D.dist
@@ -83,5 +81,4 @@ function main()
         @show size(D.db.matrix), D.dist
         run_experiment(D, k)
     end
-    =#
 end
