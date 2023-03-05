@@ -15,7 +15,7 @@ function encode_object!(M::TopK, out, v, res::KnnResult, tmp::BitArray)
     fill!(tmp, 0)
     
     for i in eachindex(v)
-        push!(res, i, -v[i])
+        push_item!(res, IdWeight(i, -v[i]))
     end
     
     for i in idview(res)

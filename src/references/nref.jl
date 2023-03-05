@@ -28,7 +28,7 @@ function encode_object!(M::NearestReference, vout, v, nn)
         col = view(M.pool, :, i)
         nn = reuse!(nn, 1)
         for j in col
-            push!(nn, j, evaluate(M.dist, v, M.refs[j]))
+            push_item!(nn, IdWeight(j, evaluate(M.dist, v, M.refs[j])))
         end
 
         vout[i] = argmin(nn)
