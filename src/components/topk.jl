@@ -4,8 +4,10 @@ struct TopK <: AbstractSurrogate
     topk::Int
     dim::Int
    
-    TopK(topk, dim) = new(topk, ceil(Int, dim / 64) * 64)
 end
+
+distance(::TopK) = BinaryHammingDistance()
+fit(::Type{TopK}, topk, dim) = TopK(topk, ceil(Int, dim / 64) * 64)
 
 topk(T::TopK) = T.topk
 dim(T::TopK) = T.dim
@@ -25,12 +27,12 @@ function encode_object!(M::TopK, out, v, res::KnnResult, tmp::BitArray)
     copy!(out, tmp.chunks)
 end
 
-function encode_database(M::TopK, db_::AbstractDatabase)
+function predict(M::TopK, db_::AbstractDatabase; minbatch::Int=4)
     D = Matrix{UInt64}(undef, dim(M) ÷ 64, length(db_))
     R = [KnnResult(M.topk) for _ in 1:Threads.nthreads()]
     B = [BitArray(undef, dim(M)) for _ in 1:Threads.nthreads()]
 
-    Threads.@threads for i in eachindex(db_)
+    @batch per=thread minbatch=minbatch for i in eachindex(db_)
         tid = Threads.threadid()
         encode_object!(M, view(D, :, i), db_[i], R[tid], B[tid])
     end
@@ -38,6 +40,9 @@ function encode_database(M::TopK, db_::AbstractDatabase)
     MatrixDatabase(D)
 end
 
+predict(M::TopK, v::AbstractVector) = encode_object!(M, Vector{UInt64}(undef, dim(M) ÷ 64, v, KnnResult(M.topk), BitArray(undef, dim(M)))
+
+#=
 function encode(M::TopK, db_::AbstractDatabase, queries_::AbstractDatabase, params)
     dist = BinaryHammingDistance()
     db = encode(M, db_)
@@ -47,3 +52,4 @@ function encode(M::TopK, db_::AbstractDatabase, queries_::AbstractDatabase, para
     
     (; db, queries, params, dist)
 end
+=#

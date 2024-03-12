@@ -41,11 +41,11 @@ struct SmoothedTopK <: AbstractSurrogate
     topk::Int
     dim::Int
     kscale::Int
-    lfun::LogisticFunction
-    
-    SmoothedTopK(topk, dim, kscale) = new(topk, dim, kscale, LogisticFunction(8))
+    lfun::LogisticFunction    
 end
 
+distance(::SmoothedTopK) = L2Distance()
+fit(::Type{SmoothedTopK}, topk, dim, kscale) = SmoothedTopK(topk, dim, kscale, LogisticFunction(8))
 kscale(T::SmoothedTopK) = T.kscale
 topk(T::SmoothedTopK) = T.topk
 dim(T::SmoothedTopK) = T.dim
@@ -61,9 +61,9 @@ function encode(M::SmoothedTopK, out, X)
     out
 end
 
-function encode(M::SmoothedTopK, db_::AbstractDatabase)
+function predict(M::SmoothedTopK, db_::AbstractDatabase; minbatch::Int=4)
     D = Matrix{Float32}(undef, dim(M), length(db_))
-    Threads.@threads for i in eachindex(db_)
+    @batch per=thread minbatch=minbatch for i in eachindex(db_)
         tid = Threads.threadid()
         encode(M, view(D, :, i), db_[i])
     end
@@ -71,6 +71,8 @@ function encode(M::SmoothedTopK, db_::AbstractDatabase)
     MatrixDatabase(D)
 end
 
+predict(M::SmoothedTopK, v::AbstractVector) = encode(M, Vector{Float32}(undef, dim(M)), v)
+#=
 function encode(M::SmoothedTopK, db_::AbstractDatabase, queries_::AbstractDatabase, params)
     dist = L2Distance()
     db = encode(M, db_)
@@ -81,3 +83,4 @@ function encode(M::SmoothedTopK, db_::AbstractDatabase, queries_::AbstractDataba
     
     (; db, queries, params, dist)
 end
+=#

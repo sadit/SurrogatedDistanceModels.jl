@@ -8,13 +8,14 @@ function select_random_refs(X::Matrix, m::Integer)
     MatrixDatabase(X[:, I[1:m]])
 end
 
-
 struct HyperplaneBinaryEncoding{DistType<:SemiMetric,DbType<:AbstractDatabase} <: AbstractSurrogate
     dist::DistType
     refs::DbType
 end
 
-function HyperplaneBinaryEncoding(dist::SemiMetric, X::MatrixDatabase, npairs::Integer)
+distance(::HyperplaneBinaryEncoding) = BinaryHammingDistance()
+
+function fit(::Type{HyperplaneBinaryEncoding}, dist::SemiMetric, X::MatrixDatabase, npairs::Integer)
     @assert npairs % 64 == 0
     HyperplaneBinaryEncoding(dist, select_random_refs(X.matrix, 2npairs))
 end
@@ -42,7 +43,7 @@ function encode_object!(B::HyperplaneBinaryEncoding, vout, v)
     end
 end
 
-function encode_database(B::HyperplaneBinaryEncoding, X::AbstractDatabase)
+function predict(B::HyperplaneBinaryEncoding, X::AbstractDatabase)
     D = Matrix{UInt64}(undef, nblocks(B), length(X))
 
     Threads.@threads for i in eachindex(X)
@@ -52,6 +53,9 @@ function encode_database(B::HyperplaneBinaryEncoding, X::AbstractDatabase)
     MatrixDatabase(D)
 end
 
+predict(B::HyperplaneBinaryEncoding, v::AbstractVector) = encode_object!(B, Vector{UInt64}(undef, nblocks(B)), v)
+
+#=
 function encode(B::HyperplaneBinaryEncoding, db_::AbstractDatabase, queries_::AbstractDatabase, params)
     dist = BinaryHammingDistance()
     db = encode_database(B, db_)
@@ -60,3 +64,4 @@ function encode(B::HyperplaneBinaryEncoding, db_::AbstractDatabase, queries_::Ab
     params["numrefs"] = numrefs(B)
     (; db, queries, params, dist)
 end
+=#

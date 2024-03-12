@@ -5,20 +5,22 @@ struct BinPerms{DistType<:SemiMetric,DbType<:AbstractDatabase} <: AbstractSurrog
     dist::DistType
     refs::DbType
     pool::Matrix{Int32}
-    shift::Int
-    
-    function BinPerms(dist::SemiMetric, refs::AbstractDatabase, nperms::Integer; permsize::Integer=64, shift::Integer=permsize ÷ 3)
-        2 <= permsize <= 64 || throw(ArgumentError("invalid permsize $permsize"))
-        pool = Matrix{Int32}(undef, permsize, nperms)
-        perm = Vector{Int32}(1:length(refs))
+    shift::Int    
+end
 
-        for i in 1:nperms
-            shuffle!(perm)
-            pool[:, i] .= view(perm, 1:permsize)
-        end
-        
-        new{typeof(dist), typeof(refs)}(dist, refs, pool, shift)
+distance(::BinPerms) = BinaryHammingDistance()
+
+function fit(::Type{BinPerms}, dist::SemiMetric, refs::AbstractDatabase, nperms::Integer; permsize::Integer=64, shift::Integer=permsize ÷ 3)
+    2 <= permsize <= 64 || throw(ArgumentError("invalid permsize $permsize"))
+    pool = Matrix{Int32}(undef, permsize, nperms)
+    perm = Vector{Int32}(1:length(refs))
+
+    for i in 1:nperms
+        shuffle!(perm)
+        pool[:, i] .= view(perm, 1:permsize)
     end
+    
+    BinPerms(dist, refs, pool, shift)
 end
 
 @inline permsize(M::BinPerms) = size(M.pool, 1)
@@ -47,17 +49,22 @@ function encode_object!(M::BinPerms, vout, v, cache::PermsCacheEncoder)
     vout
 end
 
-function encode_database(M::BinPerms, db::AbstractDatabase)
+function predict(M::BinPerms, db::AbstractDatabase; minbatch::Int=4)
     D = Matrix{UInt64}(undef, nperms(M), length(db))
     B = [PermsCacheEncoder(M) for _ in 1:Threads.nthreads()]
     
-    Threads.@threads for i in eachindex(db)
+    @batch per=thread minbatch=minbatch for i in eachindex(db)
         encode_object!(M, view(D, :, i), db[i], B[Threads.threadid()])
     end
 
     MatrixDatabase(D)
 end
 
+predict(M::BinPerms, v::AbstractVector) = permscache() do cache
+    encode_object!(M, Vector{UInt64}(undef, nperms(M)), v, cache)
+end
+
+#=
 function encode(M::BinPerms, db_::AbstractDatabase, queries_::AbstractDatabase, params)
     dist = BinaryHammingDistance()
     db = encode_database(M, db_)
@@ -69,3 +76,4 @@ function encode(M::BinPerms, db_::AbstractDatabase, queries_::AbstractDatabase, 
     
     (; db, queries, params, dist)
 end
+=#

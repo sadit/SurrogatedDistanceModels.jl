@@ -4,20 +4,22 @@ struct NearestReference{DistType<:SemiMetric,DbType<:AbstractDatabase} <: Abstra
     dist::DistType
     refs::DbType
     pool::Matrix{Int32}
+end
 
-    function NearestReference(dist::SemiMetric, refs::AbstractDatabase; permsize::Integer=32)
-        n = length(refs)
-        @assert n % permsize == 0
-        npools = n ÷ permsize
-        pool = Matrix{Int32}(undef, permsize, npools)
-        P = vec(pool)
-        for i in 1:n
-            P[i] = i
-        end
+distance(::NearestReference) = LevenshteinDistance()
 
-        shuffle!(P)
-        new{typeof(dist), typeof(refs)}(dist, refs, pool)
+function fit(::Type{NearestReference}, dist::SemiMetric, refs::AbstractDatabase; permsize::Integer=32)
+    n = length(refs)
+    @assert n % permsize == 0
+    npools = n ÷ permsize
+    pool = Matrix{Int32}(undef, permsize, npools)
+    P = vec(pool)
+    for i in 1:n
+        P[i] = i
     end
+
+    shuffle!(P)
+    NearestReference(dist, refs, pool)
 end
 
 permsize(M::NearestReference) = size(M.pool, 1)
@@ -37,22 +39,26 @@ function encode_object!(M::NearestReference, vout, v, nn)
     vout
 end
 
-function encode_database(M::NearestReference, db::AbstractDatabase)
+function predict(M::NearestReference, db::AbstractDatabase; minbatch::Int=4)
     D = Matrix{UInt32}(undef, npools(M), length(db))
-    Threads.@threads for i in eachindex(db)
+    @batch per=thread minbatch=minbatch for i in eachindex(db)
         encode_object!(M, view(D, :, i), db[i], getknnresult(1))
     end
 
     MatrixDatabase(D)
 end
 
+predict(M::NearestReference, v::AbstractVector) = encode_object!(M, Vector{UInt32}(undef, npools(M)), v, getknnresult(1))
+
+#=
 function encode(M::NearestReference, db_::AbstractDatabase, queries_::AbstractDatabase, params)
     dist = StringHammingDistance()
-    db = encode_database(M, db_)
-    queries = encode_database(M, queries_)
+    db = predict(M, db_)
+    queries = predict(M, queries_)
     params["surrogate"] = "RN"
     params["permsize"] = permsize(M)
     params["npools"] = npools(M)
     
     (; db, queries, params, dist)
 end
+=#

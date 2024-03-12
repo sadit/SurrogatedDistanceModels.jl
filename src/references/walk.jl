@@ -4,22 +4,24 @@ export BinWalk
 struct BinWalk{DistType<:SemiMetric,DbType<:AbstractDatabase} <: AbstractSurrogate
     dist::DistType
     refs::DbType
-    pool::Matrix{Int32}
-    
-    function BinWalk(dist::SemiMetric, refs::AbstractDatabase; permsize::Integer=64)
-        2 <= permsize <= 64 || throw(ArgumentError("invalid permsize $permsize"))
-        n = length(refs)
-        @assert n % permsize == 0
-        nperms = n ÷ permsize
-        pool = Matrix{Int32}(undef, permsize, nperms)
-        P = vec(pool)
-        for i in 1:n
-            P[i] = i
-        end
+    pool::Matrix{Int32}    
+end
 
-        shuffle!(P)
-        new{typeof(dist), typeof(refs)}(dist, refs, pool)
+distance(::BinWalk) = BinaryHammingDistance()
+
+function fit(::Type{BinWalk}, dist::SemiMetric, refs::AbstractDatabase; permsize::Integer=64)
+    2 <= permsize <= 64 || throw(ArgumentError("invalid permsize $permsize"))
+    n = length(refs)
+    @assert n % permsize == 0
+    nperms = n ÷ permsize
+    pool = Matrix{Int32}(undef, permsize, nperms)
+    P = vec(pool)
+    for i in 1:n
+        P[i] = i
     end
+
+    shuffle!(P)
+    BinWalk(dist, refs, pool)
 end
 
 @inline permsize(M::BinWalk) = size(M.pool, 1)
@@ -48,17 +50,23 @@ function encode_object!(M::BinWalk, vout, v, cache::PermsCacheEncoder)
     vout
 end
 
-function encode_database(M::BinWalk, db::AbstractDatabase)
+function predict(M::BinWalk, db::AbstractDatabase; minbatch::Int=4)
     D = Matrix{UInt64}(undef, nperms(M), length(db))
     B = [PermsCacheEncoder(M) for _ in 1:Threads.nthreads()]
     
-    Threads.@threads for i in eachindex(db)
+    @batch per=thread minbatch=minbatch for i in eachindex(db)
         encode_object!(M, view(D, :, i), db[i], B[Threads.threadid()])
     end
 
     MatrixDatabase(D)
 end
 
+predict(M::BinWalk, v::AbstractVector) = permscache() do cache
+    out = Vector{UInt64}(undef, nperms(M))
+    encode_object!(M, out, v, cache)
+end
+
+#=
 function encode(M::BinWalk, db_::AbstractDatabase, queries_::AbstractDatabase, params)
     dist = BinaryHammingDistance()
     db = encode_database(M, db_)
@@ -69,3 +77,4 @@ function encode(M::BinWalk, db_::AbstractDatabase, queries_::AbstractDatabase, p
     
     (; db, queries, params, dist)
 end
+=#

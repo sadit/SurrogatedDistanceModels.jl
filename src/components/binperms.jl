@@ -2,20 +2,22 @@ export CompBinPerms
 
 struct CompBinPerms <: AbstractSurrogate
     shift::Int
-    pool::Matrix{Int32}
-    
-    function CompBinPerms(nperms::Integer, dim::Integer; permsize::Integer=64, shift=dim ÷ 3)
-        2 <= permsize <= 64 || throw(ArgumentError("invalid permsize $permsize"))
-        pool = Matrix{Int32}(undef, permsize, nperms)
-        perm = Vector{Int32}(1:dim)
+    pool::Matrix{Int32}    
+end
 
-        for i in 1:nperms
-            shuffle!(perm)
-            pool[:, i] .= view(perm, 1:permsize)
-        end
-        
-        new(shift, pool)
+distance(::CompBinPerms) = BinaryHammingDistance()
+
+function fit(::Type{CompBinPerms}, nperms::Integer, dim::Integer; permsize::Integer=64, shift=dim ÷ 3)
+    2 <= permsize <= 64 || throw(ArgumentError("invalid permsize $permsize"))
+    pool = Matrix{Int32}(undef, permsize, nperms)
+    perm = Vector{Int32}(1:dim)
+
+    for i in 1:nperms
+        shuffle!(perm)
+        pool[:, i] .= view(perm, 1:permsize)
     end
+    
+    new(shift, pool)
 end
 
 @inline permsize(M::CompBinPerms) = size(M.pool, 1)
@@ -44,17 +46,24 @@ function encode_object!(M::CompBinPerms, vout, v, cache::PermsCacheEncoder)
     vout
 end
 
-function encode_database(M::CompBinPerms, db::AbstractDatabase)
+function predict(M::CompBinPerms, db::AbstractDatabase; minbatch::Int=4)
     D = Matrix{UInt64}(undef, nperms(M), length(db))
     B = [PermsCacheEncoder(M) for i in 1:Threads.nthreads()]
     
-    Threads.@threads for i in eachindex(db)
+    @batch per=thread minbatch=minbatch for i in eachindex(db)
         encode_object!(M, view(D, :, i), db[i], B[Threads.threadid()])
     end
 
     MatrixDatabase(D)
 end
 
+function predict(M::CompBinPerms, v::AbstractVector)
+    permscache() do cache
+        encode_object!(M, Vector{UInt64}(undef, nperms(M)), v, cache)
+    end
+end
+
+#=
 function encode(M::CompBinPerms, db_::AbstractDatabase, queries_::AbstractDatabase, params)
     dist = BinaryHammingDistance()
     db = encode_database(M, db_)
@@ -66,3 +75,4 @@ function encode(M::CompBinPerms, db_::AbstractDatabase, queries_::AbstractDataba
     
     (; db, queries, params, dist)
 end
+=#
