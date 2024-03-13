@@ -35,16 +35,16 @@ end
 
 function predict(rp::GaussianRandomProjection{F}, X::AbstractMatrix) where {F}
     O = Matrix{F}(undef, out_dim(rp), size(X, 2)) 
-    predict!(rp, O, MatrixDatabase(X))
+    predict!(rp, O, MatrixDatabase(X)) |> MatrixDatabase
 end
 
 function predict(rp::GaussianRandomProjection{F}, X::AbstractDatabase) where {F}
     O = Matrix{F}(undef, out_dim(rp), length(X))
-    predict!(rp, O, X)
+    predict!(rp, O, X) |> MatrixDatabase
 end
 
 function predict!(rp::GaussianRandomProjection{F}, O::AbstractMatrix, X::AbstractDatabase; minbatch::Int=4) where {F}
-    @batch per=thread minbatch=minbatch for i in 1:size(X, 2)
+    @batch per=thread minbatch=minbatch for i in 1:length(X)
         o = view(O, :, i)
         predict!(rp, o, X[i]) 
     end

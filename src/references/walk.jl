@@ -52,7 +52,7 @@ end
 
 function predict(M::BinWalk, db::AbstractDatabase; minbatch::Int=4)
     D = Matrix{UInt64}(undef, nperms(M), length(db))
-    B = [PermsCacheEncoder(M) for _ in 1:Threads.nthreads()]
+    B = [PermsCacheEncoder(permsize(M)) for _ in 1:Threads.nthreads()]
     
     @batch per=thread minbatch=minbatch for i in eachindex(db)
         encode_object!(M, view(D, :, i), db[i], B[Threads.threadid()])
@@ -61,7 +61,7 @@ function predict(M::BinWalk, db::AbstractDatabase; minbatch::Int=4)
     MatrixDatabase(D)
 end
 
-predict(M::BinWalk, v::AbstractVector) = permscache() do cache
+predict(M::BinWalk, v::AbstractVector) = permscache(permsize(M)) do cache
     out = Vector{UInt64}(undef, nperms(M))
     encode_object!(M, out, v, cache)
 end

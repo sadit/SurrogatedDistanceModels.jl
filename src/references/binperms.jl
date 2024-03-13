@@ -1,6 +1,5 @@
 export BinPerms
 
-
 struct BinPerms{DistType<:SemiMetric,DbType<:AbstractDatabase} <: AbstractSurrogate
     dist::DistType
     refs::DbType
@@ -10,8 +9,12 @@ end
 
 distance(::BinPerms) = BinaryHammingDistance()
 
-function fit(::Type{BinPerms}, dist::SemiMetric, refs::AbstractDatabase, nperms::Integer; permsize::Integer=64, shift::Integer=permsize ÷ 3)
-    2 <= permsize <= 64 || throw(ArgumentError("invalid permsize $permsize"))
+function fit(::Type{BinPerms}, dist::SemiMetric, refs::AbstractDatabase, nbits::Int; delta_shift::AbstractFloat=0.33333f0)
+    permsize = 64
+    nbits % permsize  == 0 || throw(ArgumentError("nbits must be a factor of 64"))
+    nperms = nbits ÷ permsize
+    shift = ceil(Int, permsize * delta_shift)
+    length(refs) >= permsize || throw(ArgumentError("the number of references should be higher than 64"))
     pool = Matrix{Int32}(undef, permsize, nperms)
     perm = Vector{Int32}(1:length(refs))
 
@@ -51,7 +54,7 @@ end
 
 function predict(M::BinPerms, db::AbstractDatabase; minbatch::Int=4)
     D = Matrix{UInt64}(undef, nperms(M), length(db))
-    B = [PermsCacheEncoder(M) for _ in 1:Threads.nthreads()]
+    B = [PermsCacheEncoder(permsize(M)) for _ in 1:Threads.nthreads()]
     
     @batch per=thread minbatch=minbatch for i in eachindex(db)
         encode_object!(M, view(D, :, i), db[i], B[Threads.threadid()])
@@ -60,7 +63,7 @@ function predict(M::BinPerms, db::AbstractDatabase; minbatch::Int=4)
     MatrixDatabase(D)
 end
 
-predict(M::BinPerms, v::AbstractVector) = permscache() do cache
+predict(M::BinPerms, v::AbstractVector) = permscache(permsize(M)) do cache
     encode_object!(M, Vector{UInt64}(undef, nperms(M)), v, cache)
 end
 

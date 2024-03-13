@@ -1,34 +1,27 @@
-export HyperplaneBinaryEncoding, select_random_refs
+export HyperplaneEncoding, select_random_refs
 
-function select_random_refs(X::Matrix, m::Integer)
-    n = size(X, 2)
-    @assert 2 <= m <= n
-    I = collect(1:n)
-    shuffle!(I)
-    MatrixDatabase(X[:, I[1:m]])
-end
-
-struct HyperplaneBinaryEncoding{DistType<:SemiMetric,DbType<:AbstractDatabase} <: AbstractSurrogate
+struct HyperplaneEncoding{DistType<:SemiMetric,DbType<:AbstractDatabase} <: AbstractSurrogate
     dist::DistType
     refs::DbType
 end
 
-distance(::HyperplaneBinaryEncoding) = BinaryHammingDistance()
+distance(::HyperplaneEncoding) = BinaryHammingDistance()
 
-function fit(::Type{HyperplaneBinaryEncoding}, dist::SemiMetric, X::MatrixDatabase, npairs::Integer)
-    @assert npairs % 64 == 0
-    HyperplaneBinaryEncoding(dist, select_random_refs(X.matrix, 2npairs))
+function fit(::Type{HyperplaneEncoding}, dist::SemiMetric, refs::MatrixDatabase, npairs::Integer)
+    npairs % 64 == 0 || throw(ArgumentError("npairs must be a factor of 64"))
+    length(refs) == 2npairs || throw(ArgumentError("refs must cointain 2*npairs elements"))
+    HyperplaneEncoding(dist, refs)
 end
 
-numrefs(B::HyperplaneBinaryEncoding) = length(B.refs) ÷ 2
-nblocks(B::HyperplaneBinaryEncoding) = length(B.refs) ÷ 128
+numrefs(B::HyperplaneEncoding) = length(B.refs) ÷ 2
+nblocks(B::HyperplaneEncoding) = length(B.refs) ÷ 128
 
-function encode_pair(B::HyperplaneBinaryEncoding, v, i::Integer)::Bool
+function encode_pair(B::HyperplaneEncoding, v, i::Integer)::Bool
     i = 2i
     evaluate(B.dist, B.refs[i-1], v) < evaluate(B.dist, B.refs[i], v)
 end
 
-function encode_object!(B::HyperplaneBinaryEncoding, vout, v)
+function encode_object!(B::HyperplaneEncoding, vout, v)
     j = 0
 
     for i in eachindex(vout)
@@ -43,7 +36,7 @@ function encode_object!(B::HyperplaneBinaryEncoding, vout, v)
     end
 end
 
-function predict(B::HyperplaneBinaryEncoding, X::AbstractDatabase)
+function predict(B::HyperplaneEncoding, X::AbstractDatabase)
     D = Matrix{UInt64}(undef, nblocks(B), length(X))
 
     Threads.@threads for i in eachindex(X)
@@ -53,10 +46,10 @@ function predict(B::HyperplaneBinaryEncoding, X::AbstractDatabase)
     MatrixDatabase(D)
 end
 
-predict(B::HyperplaneBinaryEncoding, v::AbstractVector) = encode_object!(B, Vector{UInt64}(undef, nblocks(B)), v)
+predict(B::HyperplaneEncoding, v::AbstractVector) = encode_object!(B, Vector{UInt64}(undef, nblocks(B)), v)
 
 #=
-function encode(B::HyperplaneBinaryEncoding, db_::AbstractDatabase, queries_::AbstractDatabase, params)
+function encode(B::HyperplaneEncoding, db_::AbstractDatabase, queries_::AbstractDatabase, params)
     dist = BinaryHammingDistance()
     db = encode_database(B, db_)
 	queries = encode_database(B, queries_)

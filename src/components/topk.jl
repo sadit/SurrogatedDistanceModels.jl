@@ -40,7 +40,10 @@ function predict(M::TopK, db_::AbstractDatabase; minbatch::Int=4)
     MatrixDatabase(D)
 end
 
-predict(M::TopK, v::AbstractVector) = encode_object!(M, Vector{UInt64}(undef, dim(M) ÷ 64, v, KnnResult(M.topk), BitArray(undef, dim(M)))
+function predict(M::TopK, v::AbstractVector)
+    out = Vector{UInt64}(undef, dim(M) ÷ 64)
+    encode_object!(M, out, v, KnnResult(M.topk), BitArray(undef, dim(M)))
+end
 
 #=
 function encode(M::TopK, db_::AbstractDatabase, queries_::AbstractDatabase, params)

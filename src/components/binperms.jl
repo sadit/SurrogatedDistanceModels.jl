@@ -48,7 +48,7 @@ end
 
 function predict(M::CompBinPerms, db::AbstractDatabase; minbatch::Int=4)
     D = Matrix{UInt64}(undef, nperms(M), length(db))
-    B = [PermsCacheEncoder(M) for i in 1:Threads.nthreads()]
+    B = [PermsCacheEncoder(permsize(M)) for i in 1:Threads.nthreads()]
     
     @batch per=thread minbatch=minbatch for i in eachindex(db)
         encode_object!(M, view(D, :, i), db[i], B[Threads.threadid()])
@@ -58,7 +58,7 @@ function predict(M::CompBinPerms, db::AbstractDatabase; minbatch::Int=4)
 end
 
 function predict(M::CompBinPerms, v::AbstractVector)
-    permscache() do cache
+    permscache(permsize(M)) do cache
         encode_object!(M, Vector{UInt64}(undef, nperms(M)), v, cache)
     end
 end

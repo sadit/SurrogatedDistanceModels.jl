@@ -1,2 +1,2 @@
-# SurrogateDistanceModels
-Surrogate distance models
+# SurrogatedDistanceModels
+Surrogated distance models

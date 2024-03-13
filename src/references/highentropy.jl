@@ -1,11 +1,12 @@
+export HighEntropyHyperplanes
 
-struct HighEntropySketch{D<:SemiMetric,DB<:AbstractDatabase} <: AbstractSurrogate
+struct HighEntropyHyperplanes{D<:SemiMetric,DB<:AbstractDatabase} <: AbstractSurrogate
     dist::D         # distance
     H::Vector{Pair{Int,Int}} # hyperplanes
     C::DB           # points
 end
 
-distance(::HighEntropySketch) = BinaryHammingDistance()
+distance(::HighEntropyHyperplanes) = BinaryHammingDistance()
 
 function encode1(dist::SemiMetric, C::AbstractDatabase, h::Pair, obj)
     evaluate(dist, obj, C[h[1]]) < evaluate(dist, obj, C[h[2]])
@@ -16,15 +17,15 @@ function entropy(c0, c1)
     c0/n * log2(n/c0) + c1/n * log2(n/c1)
 end
 
-function fit(::Type{HighEntropySketch},
+function fit(::Type{HighEntropyHyperplanes},
         dist::SemiMetric,
-        X::MatrixDatabase;
-        nbits = 512, # number of output bits
-        k = 128,     # number of centers to evaluate
-        k2 = 80,     # number of centers to select (smaller than k)
-        sample_for_fft = 2^13,                  # sample size to compute fft
-        sample_for_hyperplane_selection = 2^13,  # size of the second sample (largest than first, characterizes hyperplanes with this)
-        minbatch = 2
+        X::MatrixDatabase,
+        nbits::Int = 512; # number of output bits
+        k::Int = 128,     # number of centers to evaluate
+        k2::Int = 80,     # number of centers to select (smaller than k)
+        sample_for_fft::Int = 2^13,                  # sample size to compute fft
+        sample_for_hyperplane_selection::Int = 2^13,  # size of the second sample (largest than first, characterizes hyperplanes with this)
+        minbatch::Int = 2
     )
 
     nbits % 64 == 0 || throw(ArgumentError("nbits should be a factor of 64"))
@@ -93,10 +94,10 @@ function fit(::Type{HighEntropySketch},
         ent
     end
 
-    HighEntropySketch(dist, P[last.(ent)], points)
+    HighEntropyHyperplanes(dist, P[last.(ent)], points)
 end
 
-function predict(m::HighEntropySketch, obj)
+function predict(m::HighEntropyHyperplanes, obj)
     b = BitArray(undef, length(m.H))
     for i in eachindex(m.H)
         h = m.H[i]
@@ -106,7 +107,7 @@ function predict(m::HighEntropySketch, obj)
     b.chunks
 end
 
-function predict(m::HighEntropySketch, arr::AbstractDatabase; minbatch=2)
+function predict(m::HighEntropyHyperplanes, arr::AbstractDatabase; minbatch=2)
     n = length(m.H)
     b = BitArray(undef, n, length(arr))
     @batch per=thread minbatch=minbatch for j in 1:length(arr)

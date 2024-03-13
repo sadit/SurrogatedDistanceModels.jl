@@ -1,9 +1,11 @@
-module SurrogateDistanceModels
+module SurrogatedDistanceModels
 
 using SimilaritySearch, Random, StatsBase, LinearAlgebra, Polyester, Distributions
+using SimilaritySearch: evaluate
 
 abstract type AbstractSurrogate end
 import StatsAPI: fit, predict
+import SimilaritySearch: distance
 export fit, predict, AbstractSurrogate
 
 
@@ -12,8 +14,7 @@ struct PermsCacheEncoder
     invP::Vector{Int32}
     vec::Vector{Float32}
     
-    function PermsCacheEncoder(M)
-        n = permsize(M)
+    function PermsCacheEncoder(n::Integer)
         new(zeros(Int32, n), zeros(Int32, n), zeros(Float32, n))
     end
 end
@@ -28,13 +29,17 @@ end
    
 function __init__()
     for _ in 1:2*Threads.nthreads()+4
-        put!(PERMS_CACHES, PermsCacheEncoder())
+        put!(PERMS_CACHES, PermsCacheEncoder(32))
     end
 end
 
-@inline function permscache(f)
+@inline function permscache(f, n::Integer)
     buff = take!(PERMS_CACHE)
     try
+        resize!(buff.P, n)
+        resize!(buff.invP, n)
+        resize!(buff.vec, n)
+
         return f(buff) 
     finally
         put!(PERMS_CACHE, buff)
@@ -50,7 +55,8 @@ function invperm!(invP, P)
 end
 
 ###############
-    include("random-projections.jl")
+    include("rp.jl")
+    include("pca.jl")
     include("components/binencoder.jl")
     include("components/perms.jl")
     include("components/binperms.jl")

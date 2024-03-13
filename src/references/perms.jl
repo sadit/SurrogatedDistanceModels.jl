@@ -18,7 +18,7 @@ function fit(::Type{Perms}, dist::SemiMetric, refs::AbstractDatabase, nperms::In
         pool[:, i] .= view(perm, 1:permsize)
     end
     
-    new{typeof(dist), typeof(refs)}(dist, refs, pool)
+    Perms(dist, refs, pool)
 end
 
 @inline permsize(M::Perms) = size(M.pool, 1)
@@ -41,7 +41,7 @@ end
 
 function predict(M::Perms, db_::AbstractDatabase; minbatch=4)
     D = Matrix{Float32}(undef, permsize(M) * nperms(M), length(db_))
-    B = [PermsCacheEncoder(M) for _ in 1:Threads.nthreads()]
+    B = [PermsCacheEncoder(permsize(M)) for _ in 1:Threads.nthreads()]
     
     @batch per=thread minbatch=minbatch for i in eachindex(db_)
         x = reshape(view(D, :, i), permsize(M), nperms(M))
@@ -52,8 +52,8 @@ function predict(M::Perms, db_::AbstractDatabase; minbatch=4)
 end
 
 function predict(M::Perms, obj)
-    permscache() do cache
-        out = Vector{Float32}(undef, permsize() * nperms(M))
+    permscache(permsize(M)) do cache
+        out = Vector{Float32}(undef, permsize(M) * nperms(M))
         encode_object!(M, out, obj, cache)
     end
 end

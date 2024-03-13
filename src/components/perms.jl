@@ -41,7 +41,7 @@ end
 
 function predict(M::CompPerms, db_::AbstractDatabase; minbatch=4)
     D = Matrix{Float32}(undef, permsize(M) * nperms(M), length(db_))
-    B = [PermsCacheEncoder(M) for _ in 1:Threads.nthreads()]
+    B = [PermsCacheEncoder(permsize(M)) for _ in 1:Threads.nthreads()]
     
     @batch per=thread minbatch=minbatch for i in eachindex(db_)
         x = reshape(view(D, :, i), permsize(M), nperms(M))
@@ -51,15 +51,15 @@ function predict(M::CompPerms, db_::AbstractDatabase; minbatch=4)
     MatrixDatabase(D)
 end
 
-predict(M::CompPerms, v::AbstractVector) = permscache() do cache 
+predict(M::CompPerms, v::AbstractVector) = permscache(permsize(M)) do cache 
     encode_object!(M, Vector{Float32}(undef, permsize(M) * nperms(M)), v, cache)
 end
 
 #=
 function encode(M::CompPerms, db_::AbstractDatabase, queries_::AbstractDatabase, params)
     dist = SqL2Distance()
-    db = predict€kd(M, db_)
-    queries = predict€kd(M, queries_)
+    db = predict(M, db_)
+    queries = predict(M, queries_)
     params["surrogate"] = "CP"
     params["permsize"] = permsize(M)
     params["nperms"] = nperms(M)
