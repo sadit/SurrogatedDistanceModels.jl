@@ -6,7 +6,7 @@ dbfile = basename(url)
 
 isfile(dbfile) || Downloads.download(url, dbfile)
 X, Q = jldopen(dbfile) do f
-    data = f["pca32"]
+    data = f["pca32"] # 32 * 32 = 1024 bits 
     pos = ceil(Int, size(data, 2) * 0.95)
     MatrixDatabase(data[:, 1:pos]), MatrixDatabase(data[:, pos+1:end])
 end
