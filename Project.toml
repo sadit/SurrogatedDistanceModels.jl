@@ -21,7 +21,7 @@ MultivariateStats = "0.10"
 Polyester = "0.7"
 SimilaritySearch = "0.11"
 StatsAPI = "1.7"
-StatsBase = "0.33"
+StatsBase = "0.33, 0.34"
 Test = "^1.0"
 julia = "^1.8"
 
@@ -32,4 +32,3 @@ Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [targets]
 test = ["Downloads", "JLD2", "Test"]
-
