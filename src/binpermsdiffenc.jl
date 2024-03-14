@@ -1,33 +1,32 @@
-export BinWalk
+export BinPermsDiffEnc
 
-
-struct BinWalk{DistType<:SemiMetric,DbType<:AbstractDatabase} <: AbstractSurrogate
+struct BinPermsDiffEnc{DistType<:SemiMetric,DbType<:AbstractDatabase} <: AbstractSurrogate
     dist::DistType
     refs::DbType
-    pool::Matrix{Int32}    
+    pool::Matrix{UInt32}    
 end
 
-distance(::BinWalk) = BinaryHammingDistance()
+distance(::BinPermsDiffEnc) = BinaryHammingDistance()
 
-function fit(::Type{BinWalk}, dist::SemiMetric, refs::AbstractDatabase; permsize::Integer=64)
-    2 <= permsize <= 64 || throw(ArgumentError("invalid permsize $permsize"))
-    n = length(refs)
-    @assert n % permsize == 0
-    nperms = n ÷ permsize
-    pool = Matrix{Int32}(undef, permsize, nperms)
-    P = vec(pool)
-    for i in 1:n
-        P[i] = i
+function fit(::Type{BinPermsDiffEnc}, dist::SemiMetric, refs::AbstractDatabase, nbits::Int)
+    permsize = 64
+    nperms = nbits ÷ permsize
+    nbits % permsize == 0 || throw(ArgumentError("nbits should be a factor of 64"))
+    pool = Matrix{UInt32}(undef, permsize, nperms) 
+    P = collect(1:permsize)
+
+    for i in 1:nperms
+        shuffle!(P)
+        pool[:, i] .= P[1:permsize]
     end
 
-    shuffle!(P)
-    BinWalk(dist, refs, pool)
+    BinPermsDiffEnc(dist, refs, pool)
 end
 
-@inline permsize(M::BinWalk) = size(M.pool, 1)
-@inline nperms(M::BinWalk) = size(M.pool, 2)
+@inline permsize(M::BinPermsDiffEnc) = size(M.pool, 1)
+@inline nperms(M::BinPermsDiffEnc) = size(M.pool, 2)
 
-function encode_object!(M::BinWalk, vout, v, cache::PermsCacheEncoder)
+function encode_object!(M::BinPermsDiffEnc, vout, v, cache::PermsCacheEncoder)
     for i in 1:nperms(M)
         col = view(M.pool, :, i)
         for (j, k) in enumerate(col)
@@ -50,7 +49,7 @@ function encode_object!(M::BinWalk, vout, v, cache::PermsCacheEncoder)
     vout
 end
 
-function predict(M::BinWalk, db::AbstractDatabase; minbatch::Int=4)
+function predict(M::BinPermsDiffEnc, db::AbstractDatabase; minbatch::Int=4)
     D = Matrix{UInt64}(undef, nperms(M), length(db))
     B = [PermsCacheEncoder(permsize(M)) for _ in 1:Threads.nthreads()]
     
@@ -61,13 +60,13 @@ function predict(M::BinWalk, db::AbstractDatabase; minbatch::Int=4)
     MatrixDatabase(D)
 end
 
-predict(M::BinWalk, v::AbstractVector) = permscache(permsize(M)) do cache
+predict(M::BinPermsDiffEnc, v::AbstractVector) = permscache(permsize(M)) do cache
     out = Vector{UInt64}(undef, nperms(M))
     encode_object!(M, out, v, cache)
 end
 
 #=
-function encode(M::BinWalk, db_::AbstractDatabase, queries_::AbstractDatabase, params)
+function encode(M::BinPermsDiffEnc, db_::AbstractDatabase, queries_::AbstractDatabase, params)
     dist = BinaryHammingDistance()
     db = encode_database(M, db_)
     queries = encode_database(M, queries_)

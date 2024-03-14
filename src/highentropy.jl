@@ -25,7 +25,8 @@ function fit(::Type{HighEntropyHyperplanes},
         k2::Int = 80,     # number of centers to select (smaller than k)
         sample_for_fft::Int = 2^13,                  # sample size to compute fft
         sample_for_hyperplane_selection::Int = 2^13,  # size of the second sample (largest than first, characterizes hyperplanes with this)
-        minbatch::Int = 2
+        minbatch::Int = 2,
+        verbose::Bool=true
     )
 
     nbits % 64 == 0 || throw(ArgumentError("nbits should be a factor of 64"))
@@ -36,7 +37,7 @@ function fit(::Type{HighEntropyHyperplanes},
     S = shuffle!(collect(1:length(X)))
     sample = let
         s = SubDatabase(X, S[1:sample_for_fft])
-        H = fft(dist, s, k)
+        H = fft(dist, s, k; verbose)
         s.map[H.nn]
     end
  
@@ -83,7 +84,7 @@ function fit(::Type{HighEntropyHyperplanes},
 
         dbH = reshape(B.chunks, (sample_for_hyperplane_selection ÷ 64, length(P))) |> MatrixDatabase
         distH = BinaryHammingDistance()
-        F = fft(distH, dbH, 2 * nbits)
+        F = fft(distH, dbH, 2 * nbits; verbose)
         
         ent = [let
                   v0, v1 = votes[:, c]

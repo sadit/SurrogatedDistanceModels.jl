@@ -114,7 +114,7 @@ end
 @testset "HighEntropyHyperplanes" begin
     idim = length(X[1])
 
-    p = fit(HighEntropyHyperplanes, SqL2Distance(), X, 256) # 256 bits
+    p = fit(HighEntropyHyperplanes, SqL2Distance(), X, 256; verbose=false) # 256 bits
     X̂ = predict(p, X)
     Q̂ = predict(p, Q)
 
@@ -126,3 +126,32 @@ end
     @test r > 0.33
 end
 
+#=
+@testset "Nearest references" begin
+    idim = length(X[1])
+
+    p = fit(NearestReference, SqL2Distance(), rand(X, 32), 8; permsize=4) # 256 bits
+    X̂ = predict(p, X)
+    Q̂ = predict(p, Q)
+    display(Q̂)
+    O_ = ExhaustiveSearch(dist=distance(p), db=X̂)
+    knns_, _ = searchbatch(O_, Q̂, k)
+
+    r = macrorecall(knns, knns_)
+    @info "recall $(typeof(p)): $r"
+    @test r > 0.33
+end
+=#
+@testset "Binary Permutations - Random walk" begin
+    idim = length(X[1])
+
+    p = fit(BinPermsDiffEnc, SqL2Distance(), rand(X, 256), 256) # 256 bits
+    X̂ = predict(p, X)
+    Q̂ = predict(p, Q)
+    O_ = ExhaustiveSearch(dist=distance(p), db=X̂)
+    knns_, _ = searchbatch(O_, Q̂, k)
+
+    r = macrorecall(knns, knns_)
+    @info "recall $(typeof(p)): $r"
+    @test r > 0.23
+end

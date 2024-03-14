@@ -57,17 +57,10 @@ end
 ###############
     include("rp.jl")
     include("pca.jl")
-    include("components/binencoder.jl")
-    include("components/perms.jl")
-    include("components/binperms.jl")
-    include("components/maxhash.jl")
-    include("components/topk.jl")
-    include("components/smoothedtopk.jl")
-
-    include("references/hbe.jl")
-    include("references/perms.jl")
-    include("references/binperms.jl")
-    include("references/nref.jl")
-    include("references/walk.jl")
-    include("references/highentropy.jl")
+    include("hbe.jl")
+    include("perms.jl")
+    include("binperms.jl")
+    include("nref.jl")
+    include("binpermsdiffenc.jl")
+    include("highentropy.jl")
 end
