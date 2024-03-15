@@ -114,7 +114,7 @@ end
 @testset "HighEntropyHyperplanes" begin
     idim = length(X[1])
 
-    p = fit(HighEntropyHyperplanes, SqL2Distance(), X, 256; verbose=false) # 256 bits
+    p = fit(HighEntropyHyperplanes, SqL2Distance(), rand(X, 2^14), 256; sample_for_hyperplane_selection=2^13, verbose=false) # 256 bits
     X̂ = predict(p, X)
     Q̂ = predict(p, Q)
 

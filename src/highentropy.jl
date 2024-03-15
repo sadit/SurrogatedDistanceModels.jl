@@ -19,12 +19,11 @@ end
 
 function fit(::Type{HighEntropyHyperplanes},
         dist::SemiMetric,
-        X::MatrixDatabase,
-        nbits::Int = 512; # number of output bits
+        X::AbstractDatabase,
+        nbits::Int; # number of output bits
         k::Int = 128,     # number of centers to evaluate
         k2::Int = 80,     # number of centers to select (smaller than k)
-        sample_for_fft::Int = 2^13,                  # sample size to compute fft
-        sample_for_hyperplane_selection::Int = 2^13,  # size of the second sample (largest than first, characterizes hyperplanes with this)
+        sample_for_hyperplane_selection::Int = 2^14,  # characterizes hyperplanes with this
         minbatch::Int = 2,
         verbose::Bool=true
     )
@@ -33,14 +32,9 @@ function fit(::Type{HighEntropyHyperplanes},
     k > k2 || throw(ArgumentError("k > k2"))
     nbits <= k2^2/2 - k2/2 || throw(ArgumentError("k2^2/2 - k2/2 should be bigger than nbits"))
     sample_for_hyperplane_selection % 64 == 0 || throw(ArgumentError("sample_for_hyperplane_selection should a factor of 64"))
+    length(X) > sample_for_hyperplane_selection || throw(ArgumentError("sample_for_hyperplane_selection ($sample_for_hyperplane_selection) should be smaller than |X| ($(length(X)))"))
 
-    S = shuffle!(collect(1:length(X)))
-    sample = let
-        s = SubDatabase(X, S[1:sample_for_fft])
-        H = fft(dist, s, k; verbose)
-        s.map[H.nn]
-    end
- 
+    sample = fft(dist, X, k; verbose).centers
     points = let ## most populated centers
         M = sort!(countmap(sample) |> collect, by=last, rev=true)
         M_ = [M[i][1] for i in 1:k2]
@@ -59,7 +53,7 @@ function fit(::Type{HighEntropyHyperplanes},
         P
     end
 
-    shuffle!(S)
+    S = shuffle!(collect(1:length(X)))
     resize!(S, sample_for_hyperplane_selection)
     sort!(S) 
 

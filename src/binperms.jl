@@ -67,16 +67,3 @@ predict(M::BinPerms, v::AbstractVector) = permscache(permsize(M)) do cache
     encode_object!(M, Vector{UInt64}(undef, nperms(M)), v, cache)
 end
 
-#=
-function encode(M::BinPerms, db_::AbstractDatabase, queries_::AbstractDatabase, params)
-    dist = BinaryHammingDistance()
-    db = encode_database(M, db_)
-    queries = encode_database(M, queries_)
-    params["surrogate"] = "RBP"
-    params["permsize"] = permsize(M)
-    params["nperms"] = nperms(M)
-    params["shift"] = shift(M)
-    
-    (; db, queries, params, dist)
-end
-=#
