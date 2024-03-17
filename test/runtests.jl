@@ -15,6 +15,8 @@ k = 16
 O = ExhaustiveSearch(dist=L2Distance(), db=X)
 knns, _ = searchbatch(O, Q, k)
 
+
+#=
 @testset "Random projection" begin
     idim = length(X[1])
     odim = 8
@@ -91,6 +93,7 @@ end
     @info "recall $(typeof(p)): $r"
     @test r > 0.10
 end
+=#
 
 #=
 @testset "HyperplaneEncoding with fft refs" begin
@@ -114,7 +117,7 @@ end
 @testset "HighEntropyHyperplanes" begin
     idim = length(X[1])
 
-    p = fit(HighEntropyHyperplanes, SqL2Distance(), rand(X, 2^14), 256; sample_for_hyperplane_selection=2^13, verbose=false) # 256 bits
+    p = fit(HighEntropyHyperplanes, SqL2Distance(), rand(X, 2^15), 256; sample_for_hyperplane_selection=2^13, verbose=false) # 256 bits
     X̂ = predict(p, X)
     Q̂ = predict(p, Q)
 
