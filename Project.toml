@@ -1,7 +1,7 @@
 name = "SurrogatedDistanceModels"
 uuid = "0e04eddd-96ac-454e-8372-d12cc190ad6e"
 authors = ["Eric S. Tellez <donsadit@gmail.com>"]
-version = "0.1.1"
+version = "0.1.2"
 
 [deps]
 Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
@@ -32,4 +32,3 @@ Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
 
 [targets]
 test = ["Downloads", "JLD2", "Test"]
-

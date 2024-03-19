@@ -1,4 +1,5 @@
 export HighEntropyHyperplanes
+using UnicodePlots
 
 struct HighEntropyHyperplanes{D<:SemiMetric,DB<:AbstractDatabase} <: AbstractSurrogate
     dist::D         # distance
@@ -8,12 +9,32 @@ end
 
 distance(::HighEntropyHyperplanes) = BinaryHammingDistance()
 
+function sample_pairs(n::Int, k::Int) 
+    visited = Set{Pair{Int,Int}}()
+    P = Pair{Int,Int}[]
+    sizehint!(P, k)
+    
+    for _ in 1:k
+        i = rand(1:n-1)
+        j = rand(i+1:n)
+        p = i => j
+        if p ∉ visited
+            push!(visited, p)
+            push!(P, p)
+        end
+    end
+
+    P
+end
+
 function encode1(dist::SemiMetric, C::AbstractDatabase, h::Pair, obj)
     evaluate(dist, obj, C[h[1]]) < evaluate(dist, obj, C[h[2]])
 end
 
-function entropy(c0, c1)
-    n = c0 + c1
+function entropy(binvec)
+    n = length(binvec) * 64
+    c1 = sum(count_ones, binvec)
+    c0 = n - c1
     c0/n * log2(n/c0) + c1/n * log2(n/c1)
 end
 
@@ -21,76 +42,40 @@ function fit(::Type{HighEntropyHyperplanes},
         dist::SemiMetric,
         X::AbstractDatabase,
         nbits::Int; # number of output bits
-        k::Int = 256,     # number of centers to evaluate
-        k2::Int = 196,     # number of centers to select (smaller than k)
-        sample_for_hyperplane_selection::Int = 2^14,  # characterizes hyperplanes with this
-        minbatch::Int = 4,
+        k::Int = nbits * 128,     # number of centers to evaluate
+        minent::Float64 = 0.5, # minimum accepted entropy per hyperplane
+        sample_for_hyperplane_selection::Int = 2^13,  # characterizes hyperplanes with this
+        minbatch::Int = 2,
         verbose::Bool=true
     )
 
     nbits % 64 == 0 || throw(ArgumentError("nbits should be a factor of 64"))
-    k > k2 || throw(ArgumentError("k > k2"))
-    nbits <= k2^2/2 - k2/2 || throw(ArgumentError("k2^2/2 - k2/2 should be bigger than nbits"))
+    nbits <= k || throw(ArgumentError("k should be bigger than nbits"))
     sample_for_hyperplane_selection % 64 == 0 || throw(ArgumentError("sample_for_hyperplane_selection should a factor of 64"))
     length(X) > sample_for_hyperplane_selection || throw(ArgumentError("sample_for_hyperplane_selection ($sample_for_hyperplane_selection) should be smaller than |X| ($(length(X)))"))
 
-    
-    points = let ## most populated centers
-        C = fft(dist, X, k; verbose)
-        M = sort!(countmap(C.nn) |> collect, by=last, rev=true)
-        M_ = [M[i][1] for i in 1:k2]
-        SubDatabase(X, M_) |> MatrixDatabase
-    end
-    #points = SubDatabase(X, fft(dist, X, k; verbose).centers) |> MatrixDatabase
+    @show dist, length(X), nbits, minent, sample_for_hyperplane_selection
 
-    P = let 
-        n = k2
-        P = Pair{Int,Int}[]
-        sizehint!(P, round(Int, n^2/2 - n/2))
-        for i in 1:n, j in i+1:n
-            push!(P, i => j)
-        end
-
-        P
-    end
-
-    S = shuffle!(collect(1:length(X)))
-    resize!(S, sample_for_hyperplane_selection)
-    sort!(S) 
-
-    @info "========================"
-    ent = let 
-        votes, B = let
-            m = length(P)
-            votes = zeros(Int32, 2, m)
-            B = BitArray(undef, sample_for_hyperplane_selection, m)
-            @batch per=thread minbatch=minbatch for i in 1:sample_for_hyperplane_selection
-                #for i in 1:sample_for_hyperplane_selection
-                obj = X[S[i]]
-                for j in eachindex(P)
-                    c = encode1(dist, points, P[j], obj)
-                    votes[c+1, j] += 1
-                    B[i, j] = c
-                end
+    P, dbH = let
+        S = shuffle!(collect(1:length(X))); resize!(S, sample_for_hyperplane_selection); sort!(S) 
+        P = sample_pairs(length(X), k)
+        m = length(P)
+        B = BitArray(undef, sample_for_hyperplane_selection, m)
+        @batch per=thread minbatch=minbatch for i in 1:sample_for_hyperplane_selection
+            obj = X[S[i]]
+            for j in eachindex(P)
+                B[i, j] = encode1(dist, X, P[j], obj)
             end
-
-            votes, B
         end
 
-        dbH = reshape(B.chunks, (sample_for_hyperplane_selection ÷ 64, length(P))) |> MatrixDatabase
-        distH = BinaryHammingDistance()
-        F = fft(distH, dbH, 2 * nbits; verbose)
-        
-        ent = [let
-                  v0, v1 = votes[:, c]
-                  entropy(v0, v1) => c
-                  end for c in F.centers] 
-        sort!(ent, by=first, rev=true)
-        resize!(ent, nbits)
-        ent
+        H = reshape(B.chunks, (sample_for_hyperplane_selection ÷ 64, length(P))) |> MatrixDatabase
+        E = [entropy(H[i]) >= minent for i in eachindex(H)]
+        P[E], H.matrix[:, E] |> MatrixDatabase
     end
 
-    HighEntropyHyperplanes(dist, P[last.(ent)], points)
+    distH = BinaryHammingDistance()
+    F = fft(distH, dbH, nbits; verbose)
+    HighEntropyHyperplanes(dist, P[F.centers], X)
 end
 
 function predict(m::HighEntropyHyperplanes, obj)
