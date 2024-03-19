@@ -1,5 +1,4 @@
 export HighEntropyHyperplanes
-using UnicodePlots
 
 struct HighEntropyHyperplanes{D<:SemiMetric,DB<:AbstractDatabase} <: AbstractSurrogate
     dist::D         # distance
