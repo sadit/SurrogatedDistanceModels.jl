@@ -27,14 +27,16 @@ function sample_pairs(n::Int, k::Int)
 end
 
 function encode1(dist::SemiMetric, C::AbstractDatabase, h::Pair, obj)
-    evaluate(dist, obj, C[h[1]]) < evaluate(dist, obj, C[h[2]])
+    evaluate(dist, obj, C[h[1]]) <= evaluate(dist, obj, C[h[2]])
 end
 
 function entropy(binvec)
     n = length(binvec) * 64
     c1 = sum(count_ones, binvec)
     c0 = n - c1
-    c0/n * log2(n/c0) + c1/n * log2(n/c1)
+    p0 = c0 / n
+    p1 = c1 / n
+    -p0 * log2(p0) - p1*log2(p1)
 end
 
 function fit(::Type{DistantHyperplanes},
@@ -43,7 +45,7 @@ function fit(::Type{DistantHyperplanes},
         nbits::Int; # number of output bits
         k::Int = nbits * 128,     # number of centers to evaluate
         minent::Float64 = 0.5, # minimum accepted entropy per hyperplane
-        sample_for_hyperplane_selection::Int = 2^13,  # characterizes hyperplanes with this
+        sample_for_hyperplane_selection::Int = 2^12,  # characterizes hyperplanes with this
         minbatch::Int = 2,
         verbose::Bool=true
     )
@@ -55,7 +57,7 @@ function fit(::Type{DistantHyperplanes},
 
     @show dist, length(X), nbits, minent, sample_for_hyperplane_selection
 
-    P, dbH = let
+    P, H = let
         S = shuffle!(collect(1:length(X))); resize!(S, sample_for_hyperplane_selection); sort!(S) 
         P = sample_pairs(length(X), k)
         m = length(P)
@@ -69,11 +71,21 @@ function fit(::Type{DistantHyperplanes},
 
         H = reshape(B.chunks, (sample_for_hyperplane_selection ÷ 64, length(P))) |> MatrixDatabase
         E = [entropy(H[i]) >= minent for i in eachindex(H)]
+        @show size(H), sum(E)
         P[E], H.matrix[:, E] |> MatrixDatabase
     end
 
-    distH = BinaryHammingDistance()
-    F = fft(distH, dbH, nbits; verbose)
+    #=
+    E = let
+        F = fft(BinaryHammingDistance(), H, 4nbits; verbose)
+        P = P[F.centers]
+        E = [(entropy(H[i]), P[i]) for i in eachindex(P)]
+        sort!(E, by=first, rev=true)
+        resize!(E, nbits)
+        E
+    end
+    =#
+    F = fft(BinaryHammingDistance(), H, nbits; verbose)
     DistantHyperplanes(dist, P[F.centers], X)
 end
 

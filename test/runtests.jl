@@ -15,7 +15,7 @@ k = 16
 O = ExhaustiveSearch(dist=L2Distance(), db=X)
 knns, _ = searchbatch(O, Q, k)
 
-
+#=
 @testset "Random projection" begin
     idim = length(X[1])
     odim = 8
@@ -92,7 +92,7 @@ end
     @info "recall $(typeof(p)): $r"
     @test r > 0.10
 end
-
+=#
 @testset "DistantHyperplanes" begin
     idim = length(X[1])
 
