@@ -62,5 +62,5 @@ end
     include("binperms.jl")
     include("nref.jl")
     include("binpermsdiffenc.jl")
-    include("highentropy.jl")
+    include("dh.jl")
 end

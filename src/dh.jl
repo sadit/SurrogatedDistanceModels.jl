@@ -1,12 +1,12 @@
-export HighEntropyHyperplanes
+export DistantHyperplanes
 
-struct HighEntropyHyperplanes{D<:SemiMetric,DB<:AbstractDatabase} <: AbstractSurrogate
+struct DistantHyperplanes{D<:SemiMetric,DB<:AbstractDatabase} <: AbstractSurrogate
     dist::D         # distance
     H::Vector{Pair{Int,Int}} # hyperplanes
     C::DB           # points
 end
 
-distance(::HighEntropyHyperplanes) = BinaryHammingDistance()
+distance(::DistantHyperplanes) = BinaryHammingDistance()
 
 function sample_pairs(n::Int, k::Int) 
     visited = Set{Pair{Int,Int}}()
@@ -37,7 +37,7 @@ function entropy(binvec)
     c0/n * log2(n/c0) + c1/n * log2(n/c1)
 end
 
-function fit(::Type{HighEntropyHyperplanes},
+function fit(::Type{DistantHyperplanes},
         dist::SemiMetric,
         X::AbstractDatabase,
         nbits::Int; # number of output bits
@@ -74,10 +74,10 @@ function fit(::Type{HighEntropyHyperplanes},
 
     distH = BinaryHammingDistance()
     F = fft(distH, dbH, nbits; verbose)
-    HighEntropyHyperplanes(dist, P[F.centers], X)
+    DistantHyperplanes(dist, P[F.centers], X)
 end
 
-function predict(m::HighEntropyHyperplanes, obj)
+function predict(m::DistantHyperplanes, obj)
     b = BitArray(undef, length(m.H))
     for i in eachindex(m.H)
         h = m.H[i]
@@ -87,7 +87,7 @@ function predict(m::HighEntropyHyperplanes, obj)
     b.chunks
 end
 
-function predict(m::HighEntropyHyperplanes, arr::AbstractDatabase; minbatch=2)
+function predict(m::DistantHyperplanes, arr::AbstractDatabase; minbatch=2)
     n = length(m.H)
     b = BitArray(undef, n, length(arr))
     @batch per=thread minbatch=minbatch for j in 1:length(arr)

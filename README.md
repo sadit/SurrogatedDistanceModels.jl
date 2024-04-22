@@ -30,7 +30,7 @@ using SimilaritySearch, SurrogatedDistanceModels
 X = MatrixDatabase(rand(64, 10^5))
 nbits = 256
 refs = rand(X, 128)
-B = fit(BinPerms, L2Distance(), refs, nbits)  # creates a BinPerms model that will map `nbits` bits per vector
+B = fit(BinPerms, L2Distance(), refs, nbits)  # creates a BinPerms model mapping input vectors to `nbits`-bit vectors
 binX = predict(B, X)  # projects the entire database `X` to the new Hamming space
 
 ## now using this to search
