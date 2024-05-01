@@ -15,7 +15,7 @@ k = 16
 O = ExhaustiveSearch(dist=L2Distance(), db=X)
 knns, _ = searchbatch(O, Q, k)
 
-#=
+
 @testset "Random projection" begin
     idim = length(X[1])
     odim = 8
@@ -92,11 +92,11 @@ end
     @info "recall $(typeof(p)): $r"
     @test r > 0.10
 end
-=#
+
 @testset "DistantHyperplanes" begin
     idim = length(X[1])
 
-    p = fit(DistantHyperplanes, SqL2Distance(), rand(X, 2^16), 256; sample_for_hyperplane_selection=2^13, verbose=false) # 256 bits
+    p = fit(DistantHyperplanes, SqL2Distance(), X, 256; verbose=false) # 256 bits
     X̂ = predict(p, X)
     Q̂ = predict(p, Q)
 
