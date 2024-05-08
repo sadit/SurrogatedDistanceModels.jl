@@ -58,26 +58,26 @@ function fit(::Type{DistantHyperplanes},
         dist::SemiMetric,
         X::AbstractDatabase,
         nbits::Int; # number of output bits
-        k::Int = nbits * 1024,     # number of centers to evaluate
+        hsel::Int = nbits * 1024,     # number of centers to evaluate
         minent::Float64 = 0.99, # minimum accepted entropy per hyperplane
-        sample_for_hyperplane_selection::Int = 2^13,  # characterizes hyperplanes with this
+        henc::Int = 2^13,  # characterizes hyperplanes with this
         minbatch::Int = 2,
         verbose::Bool=true
     )
 
     nbits % 64 == 0 || throw(ArgumentError("nbits should be a factor of 64"))
-    nbits <= k || throw(ArgumentError("k should be bigger than nbits"))
-    sample_for_hyperplane_selection % 64 == 0 || throw(ArgumentError("sample_for_hyperplane_selection should a factor of 64"))
-    length(X) > sample_for_hyperplane_selection || throw(ArgumentError("sample_for_hyperplane_selection ($sample_for_hyperplane_selection) should be smaller than |X| ($(length(X)))"))
+    nbits <= hsel || throw(ArgumentError("hsel should be bigger than nbits"))
+    henc % 64 == 0 || throw(ArgumentError("henc should a factor of 64"))
+    length(X) > henc || throw(ArgumentError("henc ($henc) should be smaller than |X| ($(length(X)))"))
 
-    @show dist, length(X), nbits, minent, sample_for_hyperplane_selection
+    @show dist, length(X), nbits, minent, henc
     XX = X;
     #=XX = let S = distsample(dist, X)
         sort!(S)
         D = neardup(dist, X, S[2])
         X[D.centers] |> MatrixDatabase
     end
-    @assert length(X) > sample_for_hyperplane_selection
+    @assert length(X) > henc
     =#
     #=XX = let D = fft(dist, X, 2^11)
         X[D.centers] |> MatrixDatabase
@@ -89,11 +89,11 @@ function fit(::Type{DistantHyperplanes},
     end =#
 
     P, H = let
-        P = sample_pairs(length(XX), k)
-        S = shuffle!(collect(1:length(X))); resize!(S, sample_for_hyperplane_selection); sort!(S) 
-        #S = fft(dist, X, sample_for_hyperplane_selection).centers
-        B = BitArray(undef, sample_for_hyperplane_selection, length(P))
-        @batch per=thread minbatch=minbatch for i in 1:sample_for_hyperplane_selection
+        P = sample_pairs(length(XX), hsel)
+        S = shuffle!(collect(1:length(X))); resize!(S, henc); sort!(S) 
+        #S = fft(dist, X, henc).centers
+        B = BitArray(undef, henc, length(P))
+        @batch per=thread minbatch=minbatch for i in 1:henc
             obj = X[S[i]]
             for j in eachindex(P)
                 b = encode1(dist, XX, P[j], obj)
@@ -101,7 +101,7 @@ function fit(::Type{DistantHyperplanes},
             end
         end
 
-        H = reshape(B.chunks, (sample_for_hyperplane_selection ÷ 64, length(P))) |> MatrixDatabase
+        H = reshape(B.chunks, (henc ÷ 64, length(P))) |> MatrixDatabase
         E = [entropy(H[i]) >= minent for i in eachindex(H)]
         @show size(H), sum(E)
         P[E], H.matrix[:, E] |> MatrixDatabase
