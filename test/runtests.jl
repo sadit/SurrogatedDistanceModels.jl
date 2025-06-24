@@ -1,19 +1,57 @@
 using SimilaritySearch, SurrogatedDistanceModels 
-using Test, LinearAlgebra, StatsBase, Random, Downloads, JLD2
+using Test, LinearAlgebra, StatsBase, Random, Downloads, HDF5
 
-url = "https://sisap-23-challenge.s3.amazonaws.com/SISAP23-Challenge/laion2B-en-pca32v2-n=300K.h5"
-dbfile = basename(url)
+url = "https://huggingface.co/datasets/sadit/SISAP2025/resolve/main/benchmark-dev-ccnews-fp16.h5?download=true"
+dbfile = first(split(basename(url), '?'))
 
 isfile(dbfile) || Downloads.download(url, dbfile)
-X, Q = jldopen(dbfile) do f
-    data = f["pca32"] # 32 * 32 = 1024 bits 
-    pos = ceil(Int, size(data, 2) * 0.95)
-    MatrixDatabase(data[:, 1:pos]), MatrixDatabase(data[:, pos+1:end])
-end
 
 k = 16
-O = ExhaustiveSearch(dist=L2Distance(), db=X)
-knns, _ = searchbatch(O, Q, k)
+X, Q, knns = h5open(dbfile) do f
+    MatrixDatabase(f["train"][]), MatrixDatabase(f["itest/queries"][]), f["itest/knns"][1:k, :]
+end
+ctx = GenericContext() # shared context 
+
+#=
+@testset "Nearest references" begin
+    idim = length(X[1])
+
+    p = fit(NearestReference, NormalizedCosine_asf32(), rand(X, 2048); vocsize=16, seqsize=128) # 256 bits
+    X̂ = predict(p, X)
+    Q̂ = predict(p, Q)
+    O_ = ExhaustiveSearch(dist=distance(p), db=X̂)
+    knns_, _ = searchbatch(O_, ctx, Q̂, k)
+
+    r = macrorecall(knns, knns_)
+    @info "recall $(typeof(p)): $r"
+    @test r > 0.33
+end
+=#
+
+
+@testset "PQFFT4" begin
+    idim = length(X[1])
+    p = fit(PQFFT4, SqL2Distance(), SubDatabase(X, 1:2^14); blocksize=2) # 256 bits
+    #display(p.refs.db.matrix)
+    X̂ = predict(p, X)
+    Q̂ = predict(p, Q)
+    QQ = predict(p, SubDatabase(Q, [1, 2, 3]))
+    #display(knns[:, 1])
+    #display(Q̂[1])
+    #display(QQ[1])
+    #display(evaluate(distance(p), Q̂[1], QQ[1]))
+    O_ = ExhaustiveSearch(dist=distance(p), db=X̂)
+    knns_, _ = searchbatch(O_, ctx, Q̂, k)
+    
+    #display(Q̂[1])
+    #display(X̂[26711])
+    #display(evaluate(O_.dist, Q̂[1], X̂[26711]))
+    #display(evaluate(O_.dist, Q̂[1], X̂[26713]))
+
+    r = macrorecall(Set.(eachcol(knns)), Set.(eachcol(knns_)))
+    @info "recall $(typeof(p)): $r"
+    @test r > 0.33
+end
 
 
 @testset "Random projection" begin
@@ -25,7 +63,7 @@ knns, _ = searchbatch(O, Q, k)
     Q̂ = predict(rp, Q)
 
     O_ = ExhaustiveSearch(dist=distance(rp), db=X̂)
-    knns_, _ = searchbatch(O_, Q̂, k)
+    knns_, _ = searchbatch(O_, ctx, Q̂, k)
 
     r = macrorecall(knns, knns_)
     @info "recall $(typeof(rp)) $r"
@@ -41,7 +79,7 @@ end
     Q̂ = predict(p, Q)
 
     O_ = ExhaustiveSearch(dist=distance(p), db=X̂)
-    knns_, _ = searchbatch(O_, Q̂, k)
+    knns_, _ = searchbatch(O_, ctx, Q̂, k)
 
     r = macrorecall(knns, knns_)
     @info "recall $(typeof(p)): $r"
@@ -56,7 +94,7 @@ end
     Q̂ = predict(p, Q)
 
     O_ = ExhaustiveSearch(dist=distance(p), db=X̂)
-    knns_, _ = searchbatch(O_, Q̂, k)
+    knns_, _ = searchbatch(O_, ctx, Q̂, k)
 
     r = macrorecall(knns, knns_)
     @info "recall $(typeof(p)): $r"
@@ -71,7 +109,7 @@ end
     Q̂ = predict(p, Q)
 
     O_ = ExhaustiveSearch(dist=distance(p), db=X̂)
-    knns_, _ = searchbatch(O_, Q̂, k)
+    knns_, _ = searchbatch(O_, ctx, Q̂, k)
 
     r = macrorecall(knns, knns_)
     @info "recall $(typeof(p)): $r"
@@ -86,7 +124,7 @@ end
     Q̂ = predict(p, Q)
 
     O_ = ExhaustiveSearch(dist=distance(p), db=X̂)
-    knns_, _ = searchbatch(O_, Q̂, k)
+    knns_, _ = searchbatch(O_, ctx, Q̂, k)
 
     r = macrorecall(knns, knns_)
     @info "recall $(typeof(p)): $r"
@@ -101,29 +139,15 @@ end
     Q̂ = predict(p, Q)
 
     O_ = ExhaustiveSearch(dist=distance(p), db=X̂)
-    knns_, _ = searchbatch(O_, Q̂, k)
+    knns_, _ = searchbatch(O_, ctx, Q̂, k)
 
     r = macrorecall(knns, knns_)
     @info "recall $(typeof(p)): $r"
     @test r > 0.33
 end
 
-#=
-@testset "Nearest references" begin
-    idim = length(X[1])
 
-    p = fit(NearestReference, SqL2Distance(), rand(X, 32), 8; permsize=4) # 256 bits
-    X̂ = predict(p, X)
-    Q̂ = predict(p, Q)
-    display(Q̂)
-    O_ = ExhaustiveSearch(dist=distance(p), db=X̂)
-    knns_, _ = searchbatch(O_, Q̂, k)
 
-    r = macrorecall(knns, knns_)
-    @info "recall $(typeof(p)): $r"
-    @test r > 0.33
-end
-=#
 @testset "Binary Permutations - Random walk" begin
     idim = length(X[1])
 
@@ -131,7 +155,7 @@ end
     X̂ = predict(p, X)
     Q̂ = predict(p, Q)
     O_ = ExhaustiveSearch(dist=distance(p), db=X̂)
-    knns_, _ = searchbatch(O_, Q̂, k)
+    knns_, _ = searchbatch(O_, ctx, Q̂, k)
 
     r = macrorecall(knns, knns_)
     @info "recall $(typeof(p)): $r"

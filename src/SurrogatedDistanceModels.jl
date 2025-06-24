@@ -61,6 +61,7 @@ end
     include("perms.jl")
     include("binperms.jl")
     include("nref.jl")
+    include("pqfft.jl")
     include("binpermsdiffenc.jl")
     include("dh.jl")
 end
